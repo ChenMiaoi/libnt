@@ -45,7 +45,20 @@ class file_discriptor {
         explicit fd_wrapper(const value_type fd);
         ~fd_wrapper();
 
+        /**
+         * @brief Close the file descriptor.
+         * 
+         * This function closes the file descriptor, releasing any system resources associated with it.
+         */
         void close();
+        /**
+         * @brief Check if the file descriptor is valid.
+         * 
+         * This function checks if the file descriptor is valid and can be used for I/O operations.
+         * 
+         * @return true if the file descriptor is valid, false otherwise.
+         */
+        flag_type  is_valid() const;
 
         fd_wrapper(const fd_wrapper&)   = delete;
         fd_wrapper(fd_wrapper&&)        = delete;

@@ -1,5 +1,6 @@
 #include "include/fd.h"
 #include "include/defs.h"
+#include "log.h"
 #include <algorithm>
 #include <bits/types/struct_timeval.h>
 #include <cstddef>
@@ -16,8 +17,9 @@ NT_NAMESPACE_BEGEN
 file_discriptor::fd_wrapper::fd_wrapper(const value_type fd)
     : _fd(fd), _eof(false), _closed(false)
     , _read_count(0), _write_count(0) {
-    if (_fd < 0) {
-        throw std::runtime_error("invalid fd: " + std::to_string(_fd));
+    if (_fd < 0 || !is_valid()) {
+        fatal << "invalid file discriptor `" << _fd << "`";
+        exit(1);
     }
 }
 
@@ -29,6 +31,8 @@ void file_discriptor::fd_wrapper::close() {
     ::close(_fd);
     _fd = -1;
 }
+bool file_discriptor::fd_wrapper::is_valid() const 
+    { return fcntl(_fd, F_GETFD) != -1; }
 
 file_discriptor::file_discriptor(const value_type fd)
     : _internal_fd(std::make_shared<fd_wrapper>(fd)) {}
@@ -43,18 +47,21 @@ std::string file_discriptor::read(const value_type limit) {
 }
 
 ssize_t file_discriptor::read(std::string &buf, const value_type limit) {
-    void* but_t;
     size_t buf_size = std::min<size_t>(1024 * 1024, limit);
+    //! Previously, we neglected to allocate for `but_t`, resulting in a read failure
+    void* but_t = (void*)malloc(buf_size);
 
     ssize_t read_len = ::read(get_fd(), but_t, buf_size);
     if (limit > 0 && read_len == 0) set_eof();
-    if (read_len > static_cast<ssize_t>(buf_size))
-        throw std::runtime_error("read() read more than requested");
+    if (read_len > static_cast<ssize_t>(buf_size)) {
+        fatal << "read() read more than requested";
+        return -1;
+    }
     buf = static_cast<char*>(but_t);
 
     update_rd();
 
-    return buf.size();
+    return read_len;
 }
 
 ssize_t file_discriptor::write(const char* src, const value_type buf_len) {
@@ -69,6 +76,11 @@ ssize_t file_discriptor::write(const char* src, const value_type buf_len) {
 ssize_t file_discriptor::write(const std::string& src, const value_type limit) {
     size_t write_size = limit <= src.size() ? limit : src.size();
     ssize_t write_len = ::write(get_fd(), src.data(), write_size);
+    if (write_len < 0) {
+        fatal << "write error!";
+        _internal_fd->close();
+        exit(1);
+    }
     
     return write_len;
 }
@@ -85,21 +97,13 @@ bool file_discriptor::is_readable() {
 bool file_discriptor::is_writable() {
     return _internal_fd->_write_count < 1;
 }
-// bool file_discriptor::set_timeout(const value_type seconds, const value_type microseconds) {
-//     return {};
-// }
-// void file_discriptor::async_read() {
-//     // TODO
-// }
-// void file_discriptor::async_write() {
-//     // TODO
-// }
 file_discriptor file_discriptor::duplicate() const {
     return file_discriptor(_internal_fd);
 }
 void file_discriptor::set_blocking() {
     int flag = ::fcntl(get_fd(), F_GETFL);
-    if (is_blocking()) {
+    //! There was a bug here earlier, but now it has been fixed
+    if (!is_blocking()) {
         flag ^= (flag & O_NONBLOCK);
     } else {
         flag |= O_NONBLOCK;
