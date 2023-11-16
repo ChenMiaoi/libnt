@@ -7,6 +7,7 @@
 #include <string>
 #include <cmath>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include <algorithm>
 #include <utility>
@@ -17,6 +18,10 @@
 
 NT_NAMESPACE_BEGEN
 
+/**
+ * @brief The `file_discriptor` is a wrapper for the native file descriptor
+ * used as a prerequisite for implementing various encapsulations.
+ */
 class file_discriptor {
     using __self            = file_discriptor*;
     using __self_const      = const file_discriptor*;
@@ -27,14 +32,17 @@ class file_discriptor {
     using ret_type      = ssize_t;
     using limits        = std::numeric_limits<value_type>;
 
+    /**
+     * @brief The `fd_wrapper` struct is a wrapper for a file descriptor.
+     */
     struct fd_wrapper {
-        value_type _fd;
-        flag_type  _eof;
-        flag_type  _closed;
-        ret_type   _read_count;
-        ret_type   _write_count;
+        value_type _fd;         // The raw file descriptor.
+        flag_type  _eof;        // Flag indicating if the end of file has been reached.
+        flag_type  _closed;     // Flag indicating if the file descriptor is closed.
+        ret_type   _read_count; // The count of reader.
+        ret_type   _write_count;// The count of writer.
 
-        explicit fd_wrapper(value_type fd);
+        explicit fd_wrapper(const value_type fd);
         ~fd_wrapper();
 
         void close();
@@ -51,30 +59,97 @@ private:
     explicit file_discriptor(std::shared_ptr<fd_wrapper> dup);
 
     void update_rd();
-    void update_wd();
+    void update_wt();
 public:
+    /**
+     * @brief Construct a file_discriptor object with the given file descriptor.
+     * @param fd The file descriptor to be wrapped.
+     */
     explicit file_discriptor(value_type fd);
     ~file_discriptor() = default;
 
-    file_discriptor(__self_ref_const)   = delete;
-    file_discriptor(__self_ref&)        = delete;
-    __self_ref operator= (__self_ref_const) = delete;
-    __self_ref operator= (__self_ref&)      = delete;
+    file_discriptor(__self_ref_const)           = delete;
+    file_discriptor(file_discriptor&&)          = default;
+    __self_ref operator= (__self_ref_const)     = delete;
+    __self_ref operator= (file_discriptor&&)    = default;
 
-    // TODO
+    /**
+     * @brief Read data from the file descriptor.
+     * 
+     * @param limit The maximum number of bytes to read.
+     * @return The data read from the file descriptor.
+     */
+    std::string read(const value_type limit = limits::max());
+    /**
+     * @brief Read data from the file descriptor into the given buffer.
+     * 
+     * @param buf The buffer to read the data into.
+     * @param limit The maximum number of bytes to read.
+     * @return The number of bytes read.
+     */
     ret_type read(std::string& buf, const value_type limit = limits::max());
-    ret_type write();
-    ret_type send();
-    ret_type receive();
+    /**
+     * @brief Write data to the file descriptor.
+     * 
+     * @param src The data to be written.
+     * @param buf_len The length of the data.
+     * @return The number of bytes written.
+     */
+    ret_type write(const char* src, const value_type buf_len);
+    /**
+     * @brief Write data to the file descriptor.
+     * 
+     * @param src The data to be written.
+     * @param limit The maximum number of bytes to write.
+     * @return The number of bytes written.
+     */
+    ret_type write(const std::string& src, const value_type limit);
+    /**
+     * @brief Send data through the file descriptor.
+     * 
+     * @param src The data to be sent.
+     * @param buf_len The length of the data.
+     * @return The number of bytes sent.
+     */
+    ret_type send(const char* src, const value_type buf_len);
+    /**
+     * @brief Receive data from the file descriptor.
+     * 
+     * @param buf The buffer to receive the data into.
+     * @param limit The maximum number of bytes to receive.
+     * @return The number of bytes received.
+     */
+    ret_type receive(std::string& buf, const value_type limit = limits::max());
+    /**
+     * @brief Check if the file descriptor is readable.
+     * 
+     * @return true if the file descriptor is readable, false otherwise.
+     */
     flag_type is_readable();
+    /**
+     * @brief Check if the file descriptor is writable.
+     * 
+     * @return true if the file descriptor is writable, false otherwise.
+     */
     flag_type is_writable();
-    flag_type set_timeout();
-    void async_read();
-    void async_write();
-    void duplicate() const;
+    /**
+     * @brief Create a duplicate of the file descriptor.
+     * 
+     * @return A new file_discriptor object that shares the same file descriptor.
+     */
+    file_discriptor duplicate() const;
+    /**
+     * @brief Set the file descriptor to blocking mode.
+     */
     void set_blocking();
+    /**
+     * @brief Close the file descriptor.
+     */
     void close();
     // TODO future
+    // flag_type set_timeout(const value_type seconds, const value_type microseconds);
+    // void async_read();
+    // void async_write();
     // flag_type enable_tls();
     // flag_type enable_multicast();
     // flag_type enable_broadcast();
@@ -83,11 +158,45 @@ public:
     // ret_type  zero_copy();
     // ret_type  batch_send();
 public:
+    /**
+     * @brief Set the end of file flag.
+     */
     void       set_eof();
+    /**
+     * @brief Get the file descriptor.
+     * 
+     * @return The file descriptor.
+     */
     value_type get_fd() const;
+    /**
+     * @brief Check if the end of file has been reached.
+     * 
+     * @return true if the end of file has been reached, false otherwise.
+     */
     flag_type  eof() const;
+    /**
+     * @brief Check if the file descriptor is in blocking mode.
+     * 
+     * @return true if the file descriptor is in blocking mode, false otherwise.
+     */
+    flag_type  is_blocking() const;
+    /**
+     * @brief Check if the file descriptor is closed.
+     * 
+     * @return true if the file descriptor is closed, false otherwise.
+     */
     flag_type  is_closed() const;
+    /**
+     * @brief Get the count of readers.
+     * 
+     * @return The count of readers.
+     */
     ret_type   get_rd_count() const;
+    /**
+     * @brief Get the count of writers.
+     * 
+     * @return The count of writers.
+     */
     ret_type   get_wt_count() const;
 };
 
