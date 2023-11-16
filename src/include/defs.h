@@ -9,4 +9,9 @@
 #define NT_NAMESPACE_END }
 #endif
 
+#ifndef NT_LOGGER
+#define NT_LOGGER
+#include "log.h"
+#endif 
+
 #endif //! __LIBNT_DEFS_H
