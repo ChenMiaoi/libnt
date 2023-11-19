@@ -1,8 +1,38 @@
 #ifndef __LIBNT_MALLOC_INTERNAL_H
 #define __LIBNT_MALLOC_INTERNAL_H
 
+#include "ntmalloc.h"
 #include "types.h"
+#include <cstddef>
+#include <cstdint>
 #include <utility>
+
+NT_NAMESPACE_BEGEN
+
+/**
+ * --------------------------------------
+ * For Branch Prediction
+ * --------------------------------------
+ */
+#if defined (__GNUC__) || defined (__clang__)
+/**
+ * @brief Hint that the expression x is `unlikely to be true in normal` circumstances
+ * 
+ * @param x The expression to be hinted
+ * @return The hinted expression
+ */
+#define nt_unlikely(x)    __builtin_expect((x), 0)
+/**
+ * @brief Hint that the expression x is `likely to be true in normal` circumstances
+ * 
+ * @param x The expression to be hinted
+ * @return The hinted expression
+ */
+#define nt_likely(x)      __builtin_expect((x), 1)
+#else
+#define nt_unlikely(x)
+#define nt_likely(x)
+#endif
 
 /**
  * @brief Unused macro to suppress unused variable warnings.
@@ -42,7 +72,75 @@
     QEMPTY(2560),  QEMPTY(3072),  QEMPTY(3584),  QEMPTY(4096),  QEMPTY(5120),  QEMPTY(6144),  QEMPTY(7168),  QEMPTY(8192), \
     QEMPTY(10240), QEMPTY(12288), QEMPTY(14336), QEMPTY(16384), QEMPTY(20480), QEMPTY(24576), QEMPTY(28672), QEMPTY(32768), \
     QEMPTY(40960), QEMPTY(49152), QEMPTY(57344), QEMPTY(65536), QEMPTY(81920), QEMPTY(98304), QEMPTY(114688), \
-    QEMPTY(MI_LARGE_WSIZE_MAX + 1  /*131072, Huge queue */), \
-    QEMPTY(MI_LARGE_WSIZE_MAX + 2) /* Full queue */ }
+    QEMPTY(NT_LARGE_WSIZE_MAX + 1  /*131072, Huge queue */), \
+    QEMPTY(NT_LARGE_WSIZE_MAX + 2) /* Full queue */ }
+
+/**
+ * @brief Calculates the word size from the given size
+ * 
+ * This function calculates the word size from the given size.
+ * 
+ * @param size The size for which to calculate the word size
+ * @return The calculated word size
+ */
+static inline size_t _nt_wsize_from_size(size_t size) {
+  return (size + sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
+}
+
+/**
+ * @brief default heap to allocate from
+ */
+extern nt_thread(nt_heap_t*) _nt_heap_default;
+/**
+ * @brief An empty heap
+ */
+extern const nt_heap_t _nt_heap_empty;
+
+/**
+ * @brief Retrieves the default heap
+ * 
+ * This function retrieves the default heap.
+ * 
+ * @return A pointer to the default heap
+ */
+static inline nt_heap_t* nt_get_default_heap(void) {
+  return _nt_heap_default;
+}
+
+/**
+ * @brief Retrieves a free small page from the heap
+ * 
+ * This function retrieves a free small page of the given size from the specified heap.
+ * 
+ * @param heap The heap from which to retrieve the free page
+ * @param size The size of the page to retrieve
+ * @return A pointer to the retrieved free page
+ */
+static inline nt_page_t* _nt_heap_get_free_small_page(nt_heap_t* heap, size_t size) {
+  nt_assert_internal(size <= NT_SMALL_SIZE_MAX);
+  return heap->pages_free_direct[_nt_wsize_from_size(size)];
+}
+
+#if defined (__GNUC__) || defined (__clang__)
+/**
+ * @brief TLS register on x86 is in the FS or GS register
+ * 
+ * @ref see: https://akkadia.org/drepper/tls.pdf
+ */
+static inline uintptr_t _nt_thread_id(void) {
+  uintptr_t tid;
+  #if defined (__i386__)
+  __asm__("movl %%gs:0, %0" : "=r" (tid) : :);  // IA32 32 bit always uses GS
+  #elif defined (__x86_64__)
+  __asm__("movq %%fs:0, %0" : "=r" (tid) : :); // x86_64 Linux uses FS
+  #elif defined (__arm__)
+  asm volatile ("mrc p15, 0, %0, c13, c0, 3" : "=r" (tid));
+  #endif
+
+  return tid;
+}
+#endif
+
+NT_NAMESPACE_END
 
 #endif //! __LIBNT_MALLOC_INTERNAL_H

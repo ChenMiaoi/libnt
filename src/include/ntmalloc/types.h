@@ -1,8 +1,12 @@
 #ifndef __LIBNT_MALLOC_DEFS_H
 #define __LIBNT_MALLOC_DEFS_H
 
+#include "../defs.h"
+
 #include <cstddef>
 #include <cstdint>
+
+NT_NAMESPACE_BEGEN
 
 struct nt_tld;
 struct nt_heap;
@@ -29,7 +33,47 @@ typedef nt_tld  nt_tld_t;
 #   error platform must be 32 or 64 bits
 #endif
 
-constexpr const size_t NT_INTPTR_SIZE = 1 << NT_INTPTR_SHIFT;
+/**
+ * @brief `NT_INTPTR_SIZE` is 8 byte, 
+ */
+constexpr const size_t NT_INTPTR_SIZE       = 1 << NT_INTPTR_SHIFT;
+
+/**
+ * @brief `NT_SMALL_PAGE_SHIFT` is 16, 1 << 16 = 0x10000 = 64kb
+ */
+constexpr const size_t NT_SMALL_PAGE_SHIFT  = 13 + NT_INTPTR_SHIFT;
+/**
+ * @brief `NT_LARGE_PAGE_SHIFT` is 22, 1 << 22 = 0x400000 = 4mb
+ */
+constexpr const size_t NT_LARGE_PAGE_SHIFT  = 6 + NT_SMALL_PAGE_SHIFT;
+/**
+ * @brief `NT_SEGMENT_SHIFT` = `NT_LARGE_PAGE_SHIFT`
+ */
+constexpr const size_t NT_SEGMENT_SHIFT     = NT_LARGE_PAGE_SHIFT;
+
+/**
+ * @brief `NT_SEGMENT_SIZE` is 4mb
+ */
+constexpr const size_t NT_SEGMENT_SIZE      = 1 << NT_SEGMENT_SHIFT;
+constexpr const size_t NT_SEGMENT_MASK      = (uintptr_t)NT_SEGMENT_SIZE - 1;
+
+/**
+ * @brief small page is set 64kb
+ */
+constexpr const size_t NT_SMALL_PAGE_SIZE   = 1 << NT_SMALL_PAGE_SHIFT;
+/**
+ * @brief large page is set 4mb
+ */
+constexpr const size_t NT_LARGE_PAGE_SIZE   = 1 << NT_LARGE_PAGE_SHIFT;
+
+constexpr const size_t NT_SMALL_PAGES_PER_SEGMENT = NT_SEGMENT_SIZE / NT_SMALL_PAGE_SIZE;
+constexpr const size_t NT_LARGE_PAGES_PER_SEGMENT = NT_SEGMENT_SIZE / NT_LARGE_PAGE_SIZE;
+
+constexpr const size_t NT_SMALL_WSIZE_MAX   = 128;
+constexpr const size_t NT_SMALL_SIZE_MAX    = NT_SMALL_WSIZE_MAX * sizeof(void*);
+
+constexpr const size_t NT_LARGE_SIZE_MAX    = NT_LARGE_PAGE_SIZE / 8;
+constexpr const size_t NT_LARGE_WSIZE_MAX   = NT_LARGE_SIZE_MAX >> NT_INTPTR_SHIFT;
 
 /**
  * @brief A block containing a free list
@@ -147,7 +191,6 @@ constexpr const int NT_BIN_HUGE        = 64U;
  * @brief Constant representing the size of a huge bin.
  */
 constexpr const int NT_BIN_FULL        = NT_BIN_HUGE + 1;
-constexpr const int NT_SMALL_WSIZE_MAX = 128;
 
 typedef struct nt_heap {
     nt_tld_t*               tld;
@@ -226,5 +269,35 @@ typedef struct nt_tld {
     nt_os_tld_t         os;
     nt_stats_t          stats;
 } nt_tld_t;
+
+#if !defined (NT_DEBUG)
+#if !defined (NDEBUG) || defined (_DEBUG)
+#   define NT_DEBUG 1
+#else
+#   define NT_DEBUG 0
+#endif
+#endif 
+
+#if (NT_DEBUG)
+//! use our own assertion to print without memory allocation
+// TODO void _nt_assert_fail(const char* assertion, const char* fname, unsigned int line, const char* func)
+#define nt_assert(expr)     ((expr) ? (void)0 : exit(1))
+#else
+#define nt_assert(x)
+#endif 
+
+#if (NT_DEBUG > 1)
+#define nt_assert_internal    nt_assert
+#else
+#define nt_assert_internal(x)
+#endif
+
+#if (NT_DEBUG > 2)
+#define nt_assert_expensive   nt_assert
+#else
+#define nt_assert_expensive(x)
+#endif
+
+NT_NAMESPACE_END
 
 #endif //! __LIBNT_MALLOC_DEFS_H

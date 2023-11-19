@@ -19,6 +19,14 @@
 
 #include <cstddef>
 
+/**
+ * @brief Declare a thread-local storage variable
+ * 
+ * This macro is used to declare a thread-local storage variable, which has a separate instance in each thread.
+ * 
+ * @param type The type of the variable
+ */
+#define nt_thread(type)         __thread type
 #define nt_export(type)         __attribute__((visibility("default"))) type
 /**
  * @brief Attribute to inform the compiler that the return value of a function 
@@ -42,11 +50,41 @@
 
 NT_NAMESPACE_BEGEN
 
+/**
+ * @brief Allocates a block of memory of a specified size
+ * 
+ * This function allocates a block of memory of the given size and returns a pointer to it. 
+ * nt_attr_alloc_s1(1) specifies that the function parameter at position 1 determines the allocated memory size.
+ * 
+ * @param size The size of the memory block to allocate
+ * @return A pointer to the allocated memory block
+ */
 nt_export(void*) nt_malloc(size_t size) nt_attr_malloc nt_attr_alloc_s1(1);
 
 nt_export(nt_heap_t*) nt_heap_new(void);
 
+/**
+ * @brief Allocates a block of memory of a specified size from a heap
+ * 
+ * This function allocates a block of memory of the given size from the specified heap and returns a pointer to it.
+ * nt_attr_alloc_s1(2) specifies that the second function parameter determines the allocated memory size.
+ * 
+ * @param heap The heap from which to allocate memory
+ * @param size The size of the memory block to allocate
+ * @return A pointer to the allocated memory block
+ */
 nt_export(void*) nt_heap_malloc(nt_heap_t* heap, size_t size) nt_attr_malloc nt_attr_alloc_s1(2);
+/**
+ * @brief Allocates a small block of memory from a heap
+ * 
+ * This function allocates a small block of memory of the given size from the specified heap and returns a pointer to it. 
+ * nt_attr_alloc_s1(2) specifies that the second function parameter determines the allocated memory size.
+ * 
+ * @param heap The heap from which to allocate memory
+ * @param size The size of the memory block to allocate
+ * @return A pointer to the allocated memory block
+ */
+nt_export(void*) nt_heap_malloc_small(nt_heap_t* heap, size_t size) nt_attr_malloc nt_attr_alloc_s1(2);
 
 NT_NAMESPACE_END
 
