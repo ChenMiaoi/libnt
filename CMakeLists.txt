@@ -6,7 +6,26 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 if (CMAKE_CXX_COMPLIER_ID MATCHES "Clang|GNU")
-  list(APPEND nt_flags -Wall -Wextra -Wno-unknown-pragmas -ftls-model=initial-exec)
+  list(APPEND nt_flags -std=c++11 -pedantic
+    -Wall -Wextra -Werror -Wstrict-prototypes -Wwrite-strings
+    -Wshadow -Winit-self -Wcast-align -Wformat=2
+      -Wmissing-prototypes
+      -Wstrict-overflow=2
+      -Wcast-qual
+      -Wundef
+      -Wswitch-default
+      -Wconversion
+      -Wc++-compat
+      -fstack-protector-strong
+      -Wcomma
+      -Wdouble-promotion
+      -Wparentheses
+      -Wformat-overflow
+      -Wunused-macros
+      -Wmissing-variable-declarations
+      -Wused-but-marked-unused
+      -Wswitch-enum
+  )
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     list(APPEND nt_flags -Wno-invalid-memory-model)
     list(APPEND nt_flags -fvisibility=hidden)
@@ -40,18 +59,6 @@ else()
   link_directories(/usr/local/lib)
 endif()
 
-set(ntmalloc_dir "src/include/ntmalloc")
-file(GLOB ntmalloc_sources ${ntmalloc_dir}/src/*.cc)
+add_subdirectory(src/include/ntmalloc)
 
-set(ntmalloc_basename "ntmalloc")
-message(STATUS "Output library name   : ${ntmalloc_basename}")
-
-add_library(ntmalloc_static STATIC ${ntmalloc_sources})
-set_target_properties(ntmalloc_static PROPERTIES OUTPUT_NAME ${ntmalloc_basename})
-# target_compile_definitions(ntmalloc_static PRIVATE )
-target_compile_options(ntmalloc_static PRIVATE ${nt_flags})
-target_include_directories(ntmalloc_static PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}${ntmalloc_dir}/src>
-)
-
-target_link_libraries(main gtest ntmalloc_static)
+target_link_libraries(main fd ntmalloc_static gtest)
