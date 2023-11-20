@@ -47,7 +47,7 @@ ssize_t file_discriptor::read(std::string &buf, const value_type limit) {
         fatal << "read() read more than requested";
         return -1;
     }
-    buf = static_cast<char*>(but_t);
+    buf += static_cast<char*>(but_t);
 
     update_rd();
 
