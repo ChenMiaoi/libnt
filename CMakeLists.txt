@@ -2,29 +2,17 @@ cmake_minimum_required(VERSION 3.2.0)
 project(libnt)
 
 # Set the C++ language standard
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 if (CMAKE_CXX_COMPLIER_ID MATCHES "Clang|GNU")
-  list(APPEND nt_flags -std=c++11 -pedantic
+  list(APPEND nt_flags -std=c++17 -pedantic
     -Wall -Wextra -Werror -Wstrict-prototypes -Wwrite-strings
-    -Wshadow -Winit-self -Wcast-align -Wformat=2
-      -Wmissing-prototypes
-      -Wstrict-overflow=2
-      -Wcast-qual
-      -Wundef
-      -Wswitch-default
-      -Wconversion
-      -Wc++-compat
-      -fstack-protector-strong
-      -Wcomma
-      -Wdouble-promotion
-      -Wparentheses
-      -Wformat-overflow
-      -Wunused-macros
-      -Wmissing-variable-declarations
-      -Wused-but-marked-unused
-      -Wswitch-enum
+    -Wshadow -Winit-self -Wcast-align -Wformat=2 -Wmissing-prototypes
+    -Wstrict-overflow=2 -Wcast-qual -Wundef -Wswitch-default -Wconversion
+    -Wc++-compat -fstack-protector-strong -Wcomma -Wdouble-promotion -Wparentheses
+    -Wformat-overflow -Wunused-macros -Wmissing-variable-declarations -Wused-but-marked-unused
+    -Wswitch-enum
   )
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     list(APPEND nt_flags -Wno-invalid-memory-model)
