@@ -18,6 +18,8 @@
 #include "types.h"
 
 #include <cstddef>
+#include <string>
+#include <charconv>
 
 /**
  * @brief Declare a thread-local storage variable
@@ -60,6 +62,15 @@ NT_NAMESPACE_BEGEN
  * @return A pointer to the allocated memory block
  */
 nt_export(void*) nt_malloc(size_t size) nt_attr_malloc nt_attr_alloc_s1(1);
+
+/**
+ * @brief Initializes the process for tracking statistics.
+ */
+nt_export(void) nt_process_init(void);
+/**
+ * @brief Initializes the thread for tracking statistics when `nt_malloc_generic` is called.
+ */
+nt_export(void) nt_thread_init(void);
 
 nt_export(nt_heap_t*) nt_heap_new(void);
 

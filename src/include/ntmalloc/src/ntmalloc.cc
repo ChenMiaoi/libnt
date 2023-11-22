@@ -5,13 +5,27 @@
 
 NT_NAMESPACE_BEGEN
 
+void* _nt_page_malloc(nt_heap_t* heap, nt_page_t* page, size_t size) {
+    nt_assert_internal(page->block_size == 0 || page->block_size >= size);
+    nt_block_t* block = page->free;
+    info << "block == null is " << (block == nullptr);
+    if (nt_unlikely(block == nullptr)) {
+        //! In this case, the block must be empty because of the page
+        info << "try to malloc generic";
+        return _nt_malloc_generic(heap, size);
+    }
+    nt_assert_internal(block != nullptr && _nt_ptr_page(block) == page);
+    // pop from the free list
+    
+    return {};
+}
+
 void* nt_heap_malloc_small(nt_heap_t* heap, size_t size) {
     nt_assert(size <= NT_SMALL_SIZE_MAX);
     nt_page_t* page = _nt_heap_get_free_small_page(heap, size);
     
     // TODO
-    // return _nt_page_malloc(heap, page, size);
-    return {};
+    return _nt_page_malloc(heap, page, size);
 }
 
 void* nt_heap_malloc(nt_heap_t* heap, size_t size) {

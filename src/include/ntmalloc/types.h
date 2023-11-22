@@ -140,7 +140,7 @@ typedef struct nt_page {
     uint16_t            capacity;
     uint16_t            reserved;
     
-    nt_block_t*         free;
+    nt_block_t*         free;               //! list of available free blocks (`malloc` allocates from this list)
     uintptr_t           cookie;
     size_t              used;
 
@@ -160,20 +160,24 @@ typedef enum nt_page_kind {
     NT_PAGE_HUGE,
 } nt_page_kind_t;
 
+/**
+ * @brief Segments are large allocated memory blocks (2mb on 64 bit) from
+ * the OS. Inside segments we allocated fixed size _pages_ that contain blocks.
+ */
 typedef struct nt_segment {
     nt_segment*     next;
     nt_segment*     prev;
     nt_segment*     abandoned_next;
     size_t          abandoned;
     size_t          used;
-    size_t          capacity;
+    size_t          capacity;       // count of available pages (`#free + used`)
     size_t          segment_size;
     size_t          segment_info_size;
     uintptr_t       cookie;
 
     size_t          page_shift;
     uintptr_t       thread_id;
-    nt_page_kind_t  page_kind;
+    nt_page_kind_t  page_kind;      // kind of pages: small, large, or huge
     nt_page_t       pages[1];
 } nt_segment_t;
 
@@ -204,6 +208,34 @@ typedef struct nt_heap {
     bool                    no_reclaim;
 } nt_heap_t;
 
+/**
+ * --------------------------------------------
+ * DEBUG
+ * --------------------------------------------
+ */
+
+#if !defined (NT_DEBUG)
+#if !defined (NDEBUG) || defined (_DEBUG)
+#   define NT_DEBUG 1
+#else
+#   define NT_DEBUG 0
+#endif
+#endif 
+
+/**
+ * --------------------------------------------
+ * Statistics
+ * --------------------------------------------
+ */
+
+#ifndef NT_STAT
+#   if NT_DEBUG > 0
+#       define NT_STAT 2
+#   else
+#       define NT_STAT 0
+#   endif
+#endif
+
 typedef struct nt_stat_count {
     int64_t allocated;
     int64_t freed;
@@ -232,9 +264,9 @@ typedef struct nt_stats {
     nt_stat_count_t huge;
     nt_stat_count_t malloc;
     nt_stat_counter_t seraches;
-#ifdef MI_STAT
-#   if MI_STAT > 1
-    nt_stat_count_t normal;
+#ifdef NT_STAT
+#   if NT_STAT > 1
+    nt_stat_count_t normal[NT_BIN_HUGE + 1];
 #   endif
 #endif
 } nt_stats_t;
@@ -270,13 +302,6 @@ typedef struct nt_tld {
     nt_stats_t          stats;
 } nt_tld_t;
 
-#if !defined (NT_DEBUG)
-#if !defined (NDEBUG) || defined (_DEBUG)
-#   define NT_DEBUG 1
-#else
-#   define NT_DEBUG 0
-#endif
-#endif 
 
 #if (NT_DEBUG)
 //! use our own assertion to print without memory allocation

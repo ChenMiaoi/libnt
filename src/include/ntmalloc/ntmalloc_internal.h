@@ -10,6 +10,37 @@
 NT_NAMESPACE_BEGEN
 
 /**
+ * -------------------------------------
+ * init.cc
+ * -------------------------------------
+ */
+
+uintptr_t _nt_random_init(uintptr_t seed);
+/**
+ * @brief Performs a random shuffle operation on the given value.
+ *
+ * @param x The value to be shuffled.
+ * @return The shuffled value.
+ */
+constexpr uintptr_t _nt_random_shuffle(uintptr_t x);
+
+/**
+ * --------------------------------------
+ * page.cc
+ * --------------------------------------
+ */
+
+/**
+ * @brief Allocates memory from the specified heap using a generic method
+ * if the heap is still in its default empty state when allocating in `_nt_page_malloc`.
+ * 
+ * @param heap Pointer to the heap from which to allocate memory.
+ * @param size Size of the memory to allocate.
+ * @return void* Pointer to the allocated memory, or NULL if allocation fails.
+ */
+void* _nt_malloc_generic(nt_heap_t* heap, size_t size) nt_attr_malloc;
+
+/**
  * --------------------------------------
  * For Branch Prediction
  * --------------------------------------
@@ -76,6 +107,47 @@ NT_NAMESPACE_BEGEN
     QEMPTY(NT_LARGE_WSIZE_MAX + 2) /* Full queue */ }
 
 /**
+ * @brief Macro to initialize an `nt_stat_count_t` type.
+ * 
+ * This macro expands to { 0, 0, 0, 0 }.
+ */
+#define NT_STAT_COUNT_EMPTY() { 0, 0, 0, 0 }
+
+/**
+ * @brief Conditional macro for adding additional data to `nt_stats_t` type if `NT_STAT` is greater than 1.
+ * 
+ * If NT_STAT is greater than 1, this macro adds a 65-sized data for initialization to nt_stats_t type.
+ * 
+ * @code {.cc}
+ * #ifdef NT_STAT
+   #  if NT_STAT > 1
+        nt_stat_count_t normal[NT_BIN_HUGE + 1];
+   #  endif
+   #endif
+ * @endcode
+ * 
+ */
+#if NT_STAT > 1
+#   define NT_STAT_COUNT_END_EMPTY()  , { NT_STAT_COUNT_EMPTY(), NT_INIT64(NT_STAT_COUNT_EMPTY) }
+#else
+#   define NT_STAT_COUNT_END_EMPTY()
+#endif
+
+/**
+ * @brief Macro for initializing an `nt_stats_t` type with empty values.
+ */
+#define NT_STAT_EMPTY \
+    NT_STAT_COUNT_EMPTY(), NT_STAT_COUNT_EMPTY(), \
+    NT_STAT_COUNT_EMPTY(), NT_STAT_COUNT_EMPTY(), \
+    NT_STAT_COUNT_EMPTY(), NT_STAT_COUNT_EMPTY(), \
+    NT_STAT_COUNT_EMPTY(), NT_STAT_COUNT_EMPTY(), \
+    NT_STAT_COUNT_EMPTY(), NT_STAT_COUNT_EMPTY(), \
+    NT_STAT_COUNT_EMPTY(), NT_STAT_COUNT_EMPTY(), \
+    NT_STAT_COUNT_EMPTY(), NT_STAT_COUNT_EMPTY(), \
+    { 0, 0 } \
+    NT_STAT_COUNT_END_EMPTY()
+
+/**
  * @brief Calculates the word size from the given size
  * 
  * This function calculates the word size from the given size.
@@ -95,6 +167,11 @@ extern nt_thread(nt_heap_t*) _nt_heap_default;
  * @brief An empty heap
  */
 extern const nt_heap_t _nt_heap_empty;
+/**
+ * @brief 
+ * TODO
+ */
+extern nt_heap_t _nt_heap_main;
 
 /**
  * @brief Retrieves the default heap
@@ -108,6 +185,61 @@ static inline nt_heap_t* nt_get_default_heap(void) {
 }
 
 /**
+ * @brief Checks if the heap is initialized.
+ * 
+ * @param heap Pointer to the heap to check.
+ * @return true if the heap is initialized, false otherwise.
+ */
+static inline bool nt_heap_is_initialized(nt_heap_t* heap) {
+  nt_assert_internal(heap != nullprt);
+  return (heap != &_nt_heap_empty);
+}
+
+/**
+ * @brief Returns the segment of the given pointer.
+ * 
+ * This function returns the segment to which the given pointer belongs.
+ * 
+ * @param p Pointer to a memory location.
+ * @return nt_segment_t* Pointer to the segment of the given memory location.
+ */
+static inline nt_segment_t* _nt_ptr_segment(const void* p) {
+  //! 传入的block，这里能够转化为segment，需要后续思考，目前没有相通
+  return (nt_segment_t*)((uintptr_t)p & ~NT_SEGMENT_MASK);
+}
+
+/**
+ * @brief Returns the page of the given pointer within the specified segment.
+ * 
+ * This function calculates and returns the page of the given pointer within the specified segment.
+ * 
+ * @param segment Pointer to the segment.
+ * @param p Pointer to a memory location.
+ * @return nt_page_t* Pointer to the page of the given memory location.
+ */
+static inline nt_page_t* _nt_segment_page_of(const nt_segment_t* segment, const void* p) {
+  ptrdiff_t diff = (uint8_t*)p - (uint8_t*)segment;
+  nt_assert_internal(diff >= 0 && diff < NT_SEGMENT_SIZE);
+  uintptr_t idx = (uintptr_t)diff >> segment->page_shift;
+  nt_assert_internal(idx < segment->capacity);
+  nt_assert_internal(segment->page_kind == NT_PAGE_SMALL || idx == 0);
+
+  return &((nt_segment_t*)segment)->pages[idx];
+}
+
+/**
+ * @brief Returns the page of the given pointer.
+ * 
+ * This function returns the page to which the given pointer belongs.
+ * 
+ * @param p Pointer to a memory location.
+ * @return nt_page_t* Pointer to the page of the given memory location.
+ */
+static inline nt_page_t* _nt_ptr_page(void* p) {
+  return _nt_segment_page_of(_nt_ptr_segment(p), p);
+}
+
+/**
  * @brief Retrieves a free small page from the heap
  * 
  * This function retrieves a free small page of the given size from the specified heap.
@@ -118,6 +250,7 @@ static inline nt_heap_t* nt_get_default_heap(void) {
  */
 static inline nt_page_t* _nt_heap_get_free_small_page(nt_heap_t* heap, size_t size) {
   nt_assert_internal(size <= NT_SMALL_SIZE_MAX);
+  info << "direct free pages idx = " << _nt_wsize_from_size(size);
   return heap->pages_free_direct[_nt_wsize_from_size(size)];
 }
 

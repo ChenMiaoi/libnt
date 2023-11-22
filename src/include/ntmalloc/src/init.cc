@@ -1,5 +1,9 @@
 #include "../ntmalloc.h"
 #include "../ntmalloc_internal.h"
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <string>
 
 NT_NAMESPACE_BEGEN
 
@@ -33,6 +37,117 @@ const nt_heap_t _nt_heap_empty = {
     .pages = NT_PAGE_QUEUES_EMPTY,
 };
 
+/**
+ * @brief Macro for accessing the statistics of the main thread-local data (tld_main).
+ * 
+ * This macro is used to obtain a pointer to the statistics within the main thread-local data (tld_main).
+ */
+#define tld_main_stats ((nt_stats_t*)((uint8_t*)&tld_main + offsetof(nt_tld_t, stats)))
+
+static nt_tld_t tld_main = {
+      .heap_backing = &_nt_heap_main,
+      .segments = { .stats = tld_main_stats },
+      .os = { .stats = tld_main_stats },
+      .stats = { NT_STAT_EMPTY },
+};
+
+nt_heap_t _nt_heap_main = {
+    .tld = &tld_main,
+    .pages_free_direct = NT_SMALL_PAGE_EMPTY,
+    .pages = NT_PAGE_QUEUES_EMPTY,
+};
+
+/**
+ * -----------------------------------------
+ * Initialization of random numbers
+ * -----------------------------------------
+ */
+
+constexpr uintptr_t _nt_random_shuffle(uintptr_t x) {
+    // by Sebastiano Vigna, see: <http://xoshiro.di.unimi.it/splitmix64.c>
+    if constexpr (NT_INTPTR_SIZE == 8) {
+        x ^= x >> 30;
+        x *= 0xbf58476d1ce4e5b9UL;
+        x ^= x >> 27;
+        x *= 0x94d049bb133111ebUL;
+        x ^= x >> 31;
+    } else if constexpr (NT_INTPTR_SIZE == 4) {
+    // by Chris Wellons, see: <https://nullprogram.com/blog/2018/07/31/>
+        x ^= x >> 16;
+        x *= 0x7feb352dUL;
+        x ^= x >> 15;
+        x *= 0x846ca68bUL;
+        x ^= x >> 16;
+    }
+    return x;
+}
+
+uintptr_t _nt_random_init(uintptr_t seed) {
+    return {};
+}
+
+/**
+ * ---------------------------------------------------------
+ * Run functions on process init/done, and thread init/done
+ * ---------------------------------------------------------
+ */
+
+bool _nt_process_is_initialized = false;    // set to `true` in `nt_process_init`.
+
 nt_thread(nt_heap_t*) _nt_heap_default = (nt_heap_t*)&_nt_heap_empty;
+
+void nt_thread_init(void) {
+    nt_process_init();
+}
+
+static void nt_process_done(void);
+
+auto dec2hex = [](auto x) {
+    char buffer[32];
+    auto ret = std::to_chars(buffer, buffer + 32, x, 16);
+    *ret.ptr = '\0';
+    return std::string(buffer);
+};
+
+void nt_process_init(void) {
+    //! ensure we are called once
+    if (_nt_process_is_initialized) return;
+    _nt_process_is_initialized = !_nt_process_is_initialized;
+
+    _nt_heap_main.thread_id = _nt_thread_id();
+    // _nt_verbose_message("process init: 0x%zx\n", _nt_heap_main.thread_id);
+    info << "process init: 0x" << dec2hex(_nt_heap_main.thread_id);
+
+    uintptr_t random = _nt_random_init(_nt_heap_main.thread_id);
+    _nt_heap_main.cookie = (uintptr_t)&_nt_heap_main ^ random;
+    _nt_heap_main.random = _nt_random_shuffle(random);
+#if NT_DEBUG
+    // _nt_verbose_message("debug level : %d\n", MI_DEBUG);
+    info << "debug level: " << NT_DEBUG;
+#endif
+    atexit(&nt_process_done);
+    // TODO
+    // nt_process_setup_auto_thread_done();
+    // nt_stats_reset();
+}   
+
+/**
+ * @brief 
+ * TODO
+ */
+static void nt_process_done(void) {
+    //! only shutdown if we were initialized
+    if (!_nt_process_is_initialized) return;
+
+    //! ensure we are called once
+    static bool process_done = false;
+    if (process_done) return;
+    process_done = !process_done;
+
+#ifndef NDEBUG
+    // TODO
+#endif
+    // TODO
+}
 
 NT_NAMESPACE_END
