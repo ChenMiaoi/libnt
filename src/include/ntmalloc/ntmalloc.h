@@ -71,6 +71,10 @@ nt_export(void) nt_process_init(void);
  * @brief Initializes the thread for tracking statistics when `nt_malloc_generic` is called.
  */
 nt_export(void) nt_thread_init(void);
+/**
+ * @brief 
+ */
+nt_export(void) nt_thread_done(void);
 
 nt_export(nt_heap_t*) nt_heap_new(void);
 

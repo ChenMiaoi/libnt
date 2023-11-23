@@ -5,7 +5,10 @@
 #include "types.h"
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <utility>
+
+extern std::string stack_path;
 
 NT_NAMESPACE_BEGEN
 
@@ -14,6 +17,14 @@ NT_NAMESPACE_BEGEN
  * init.cc
  * -------------------------------------
  */
+
+/**
+ * @brief 
+ *  TODO
+ * @return true 
+ * @return false 
+ */
+bool _nt_is_main_thread(void);
 
 uintptr_t _nt_random_init(uintptr_t seed);
 /**
@@ -156,6 +167,7 @@ void* _nt_malloc_generic(nt_heap_t* heap, size_t size) nt_attr_malloc;
  * @return The calculated word size
  */
 static inline size_t _nt_wsize_from_size(size_t size) {
+  stack_path += "_nt_wsize_from_size -> ";
   return (size + sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
 }
 
@@ -181,6 +193,7 @@ extern nt_heap_t _nt_heap_main;
  * @return A pointer to the default heap
  */
 static inline nt_heap_t* nt_get_default_heap(void) {
+  stack_path += "nt_get_default_heap -> ";
   return _nt_heap_default;
 }
 
@@ -191,6 +204,7 @@ static inline nt_heap_t* nt_get_default_heap(void) {
  * @return true if the heap is initialized, false otherwise.
  */
 static inline bool nt_heap_is_initialized(nt_heap_t* heap) {
+  stack_path += "nt_heap_is_initialized";
   nt_assert_internal(heap != nullprt);
   return (heap != &_nt_heap_empty);
 }
@@ -249,6 +263,7 @@ static inline nt_page_t* _nt_ptr_page(void* p) {
  * @return A pointer to the retrieved free page
  */
 static inline nt_page_t* _nt_heap_get_free_small_page(nt_heap_t* heap, size_t size) {
+  stack_path += "_nt_heap_get_free_small_page -> ";
   nt_assert_internal(size <= NT_SMALL_SIZE_MAX);
   info << "direct free pages idx = " << _nt_wsize_from_size(size);
   return heap->pages_free_direct[_nt_wsize_from_size(size)];
@@ -261,6 +276,7 @@ static inline nt_page_t* _nt_heap_get_free_small_page(nt_heap_t* heap, size_t si
  * @ref see: https://akkadia.org/drepper/tls.pdf
  */
 static inline uintptr_t _nt_thread_id(void) {
+  stack_path += "_nt_thread_id -> ";
   uintptr_t tid;
   #if defined (__i386__)
   __asm__("movl %%gs:0, %0" : "=r" (tid) : :);  // IA32 32 bit always uses GS

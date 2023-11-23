@@ -3,7 +3,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <pthread.h>
 #include <string>
+
+extern std::string stack_path;
 
 NT_NAMESPACE_BEGEN
 
@@ -83,6 +86,7 @@ constexpr uintptr_t _nt_random_shuffle(uintptr_t x) {
 }
 
 uintptr_t _nt_random_init(uintptr_t seed) {
+    stack_path += "_nt_random_init -> ";
     return {};
 }
 
@@ -93,11 +97,41 @@ uintptr_t _nt_random_init(uintptr_t seed) {
  */
 
 bool _nt_process_is_initialized = false;    // set to `true` in `nt_process_init`.
+static pthread_key_t nt_pthread_key;
+
+static void nt_pthread_done(void* value) {
+    if (value != nullptr) nt_thread_done();
+}
+
+void nt_thread_done(void) {
+    nt_heap_t* heap = nt_get_default_heap();
+    if (!_nt_is_main_thread() && nt_heap_is_initialized(heap)) {
+        nt_stat_decrease(heap->tld->stats.threads, 1);
+    }
+}
+
+/**
+ * @brief Set up handlers so `nt_thread_done` is called automatically
+ */
+static void nt_process_setup_auto_thread_done(void) {
+    stack_path += "nt_process_setup_auto_thread_done -> ";
+    static bool tls_initialized = false;
+    if (tls_initialized) return;
+    tls_initialized = true;
+    pthread_key_create(&nt_pthread_key, nt_pthread_done);
+    info << "pthread_key = " << nt_pthread_key;
+}
 
 nt_thread(nt_heap_t*) _nt_heap_default = (nt_heap_t*)&_nt_heap_empty;
 
+bool _nt_is_main_thread(void) {
+    return (_nt_heap_main.thread_id == 0 || _nt_heap_main.thread_id == _nt_thread_id());
+}
+
 void nt_thread_init(void) {
+    stack_path += "nt_thread_init -> ";
     nt_process_init();
+    // TODO
 }
 
 static void nt_process_done(void);
@@ -110,6 +144,7 @@ auto dec2hex = [](auto x) {
 };
 
 void nt_process_init(void) {
+    stack_path += "nt_process_init -> ";
     //! ensure we are called once
     if (_nt_process_is_initialized) return;
     _nt_process_is_initialized = !_nt_process_is_initialized;
@@ -119,15 +154,19 @@ void nt_process_init(void) {
     info << "process init: 0x" << dec2hex(_nt_heap_main.thread_id);
 
     uintptr_t random = _nt_random_init(_nt_heap_main.thread_id);
+    info << "random = " << random;
+
     _nt_heap_main.cookie = (uintptr_t)&_nt_heap_main ^ random;
     _nt_heap_main.random = _nt_random_shuffle(random);
+    info << "cookie = " << _nt_heap_main.cookie;
+    info << "random = " << _nt_heap_main.random;
 #if NT_DEBUG
     // _nt_verbose_message("debug level : %d\n", MI_DEBUG);
     info << "debug level: " << NT_DEBUG;
 #endif
     atexit(&nt_process_done);
     // TODO
-    // nt_process_setup_auto_thread_done();
+    nt_process_setup_auto_thread_done();
     // nt_stats_reset();
 }   
 
@@ -136,6 +175,7 @@ void nt_process_init(void) {
  * TODO
  */
 static void nt_process_done(void) {
+    stack_path += "nt_process_done -> ";
     //! only shutdown if we were initialized
     if (!_nt_process_is_initialized) return;
 

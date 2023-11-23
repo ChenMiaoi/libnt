@@ -323,6 +323,12 @@ typedef struct nt_tld {
 #define nt_assert_expensive(x)
 #endif
 
+void _nt_stat_decrease(nt_stat_count_t* stat, size_t amount);
+
+#if (NT_STAT)
+#   define nt_stat_decrease(stat, amount)       _nt_stat_decrease(&(stat), amount)
+#endif
+
 NT_NAMESPACE_END
 
 #endif //! __LIBNT_MALLOC_DEFS_H
